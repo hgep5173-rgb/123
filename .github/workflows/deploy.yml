@@ -1,4 +1,4 @@
-name: Deploy VitePress site to Pages
+name: Deploy MkDocs to Pages
 
 on:
   push:
@@ -20,18 +20,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          node-version: 20
+          python-version: 3.x
+          
       - name: Install dependencies
-        run: npm install
-      - name: Build with VitePress
-        run: npx vitepress build
+        run: pip install mkdocs-material
+        
+      - name: Build site
+        run: mkdocs build
+        
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .vitepress/dist
+          path: site
 
   deploy:
     environment:
