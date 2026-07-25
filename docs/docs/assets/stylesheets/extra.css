@@ -1,0 +1,56 @@
+:root {
+	--md-primary-fg-color: #8b5cf6;
+	--md-accent-fg-color: #22d3ee;
+}
+
+.md-header {
+	background: #151515;
+	box-shadow: none;
+}
+
+.md-tabs {
+	background: #151515;
+}
+
+[data-md-color-scheme="slate"] {
+	--md-default-bg-color: #101010;
+	--md-default-fg-color: #e7e7e7;
+	--md-code-bg-color: #171923;
+	--md-code-fg-color: #dbeafe;
+	--md-typeset-a-color: #7aa2ff;
+}
+
+.md-main__inner {
+	margin-top: 2rem;
+}
+
+.md-content__inner {
+	background: #1b1b1f;
+	border: 1px solid rgba(255, 255, 255, 0.06);
+	border-radius: 8px;
+	padding: 1.4rem 1.6rem 2rem;
+}
+
+.md-sidebar__scrollwrap {
+	background: #1b1b1f;
+	border-radius: 8px;
+}
+
+.md-search__form {
+	background: #0c0c0e;
+	border-radius: 6px;
+}
+
+.md-typeset h1 {
+	color: #ffffff;
+	font-weight: 800;
+}
+
+.md-typeset h2 {
+	border-top: 1px solid rgba(255, 255, 255, 0.08);
+	padding-top: 1.2rem;
+}
+
+.md-typeset code {
+	border-radius: 4px;
+}
