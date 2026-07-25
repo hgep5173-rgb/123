@@ -1,5 +1,0 @@
-* [Введение](README.md)
-* [Типы данных](types.md)
-* [Отрисовка (Render)](render.md)
-* [Сущности (Entity)](entity.md)
-* [Движок (Engine)](engine.md)
