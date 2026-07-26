@@ -14,6 +14,7 @@ local hp = local_player.m_iHealth
 local is_scoped = local_player.m_bIsScoped
 local flags = local_player.m_fFlags
 local origin = local_player.m_vecOrigin -- возвращает vec3_t
+local handle = local_player.m_hPlayerPawn -- возвращает новую base_entity_t, а не число!
 
 -- Запись
 local_player.m_iHealth = 100
@@ -21,9 +22,9 @@ local_player.m_bIsScoped = true
 ```
 
 ### Методы Сущности
-* `ent:get_abs_origin()` -> `vec3_t` (Возвращает абсолютные координаты сущности в мире).
-* `ent:get_class_name()` -> `string` (Возвращает имя класса, например `"C_CSPlayerPawn"`).
-* `ent:get_entity_handle()` -> `number` (Возвращает адрес сущности. Полезно для использования с `ffi.cast`).
+* `ent:get_abs_origin()` -> `vec3_t` — Возвращает абсолютные координаты сущности в мире.
+* `ent:get_class_name()` -> `string` — Возвращает имя класса, например `"C_CSPlayerPawn"`.
+* `ent:get_entity_handle()` -> `number` — Возвращает адрес сущности. Полезно для использования с `ffi.cast`.
 
 ---
 
@@ -42,17 +43,24 @@ local_player.m_bIsScoped = true
 Получает сущность по её хэндлу/индексу.
 * **Возвращает:** `base_entity_t` | `nil`
 
-### `get_entities(class_name, [inherits])`
+### `get_entities(...)` (Массив)
 Ищет все сущности указанного класса и возвращает их в виде массива (Lua table).
 * **class_name:** Строка (например, `"C_Chicken"`, `"C_SmokeGrenadeProjectile"`).
 * **inherits:** `boolean` (Искать ли дочерние классы. По умолчанию `false`).
-* **Возвращает:** `table`
+* **Возвращает:** `table` (Массив `base_entity_t`).
+```lua
+local chickens = entitylist.get_entities("C_Chicken")
+for i, chicken in ipairs(chickens) do
+    print(chicken:get_abs_origin())
+end
+```
 
-### `get_entities(class_name, callback)`
+### `get_entities(...)` (Коллбек)
 Оптимизированный поиск сущностей через функцию обратного вызова. Работает быстрее, так как не создает массивы в памяти Lua.
 ```lua
 entitylist.get_entities("C_Chicken", function(chicken)
     local pos = chicken:get_abs_origin()
     print("Found a chicken at: ", pos.x)
+    -- Возврат false прервет цикл поиска
 end)
 ```
