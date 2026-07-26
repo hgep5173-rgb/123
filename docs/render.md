@@ -1,94 +1,113 @@
 # 🎨 Отрисовка (Render API)
 
-Таблица `render` предоставляет доступ к мощному рендереру на базе ImGui, включая 2D примитивы, работу с текстурами, 3D примитивы в мире и эффекты размытия (Blur).
+Таблица `render` предоставляет доступ к мощному рендереру на базе ImGui. API включает 2D-примитивы, продвинутую работу с текстурами (включая динамическое обновление), 3D-примитивы в мире и эффекты размытия (Blur).
 
-Все функции отрисовки должны вызываться внутри коллбека `"paint"`.
+> **Важно:** Все функции отрисовки должны вызываться строго внутри коллбека `"paint"`.
 
 ---
 
 ## 🖼 Текстуры и Шрифты
 
-### `setup_font(path, size, [flags])`
-Загружает кастомный шрифт.
-* **Возвращает:** `number` (ID шрифта)
+Новая архитектура работы с текстурами автоматически переиспользует свободные слоты памяти и корректно освобождает видеопамять (VRAM) при выгрузке скриптов, предотвращая утечки.
 
-### `setup_texture(path)`
-Загружает текстуру из файла на диске.
-* **Возвращает:** `number` (ID текстуры)
+### Загрузка статических ресурсов
 
-### `setup_texture_rgba(table_pixels, vec2_t_size)`
-Создает динамическую текстуру из массива байт (RGBA).
-* **Возвращает:** `number` (ID текстуры)
+| Функция | Описание |
+| :--- | :--- |
+| `setup_font(path, size, [flags])` | Загружает кастомный шрифт с диска. Возвращает `number` (ID шрифта). |
+| `setup_texture(path, [flip_y])` | Загружает текстуру из файла. Параметр `flip_y` (boolean) переворачивает текстуру по вертикали. **Примечание:** Для путей, содержащих `avatarcache`, `flip_y` применяется автоматически. Возвращает `number` (ID текстуры). |
+| `create_panorama_svg_texture(path, height)` | Загружает SVG/текстуру из движка Panorama. Автоматически нормализует пути (окончания `.vsvg_c` и `.vtex_c` преобразуются в `.vsvg` / `.vtex`). Возвращает таблицу-объект текстуры. |
 
-### `update_texture_rgba(id, table_pixels, vec2_t_size)`
-Обновляет пиксели динамической текстуры (например, для отрисовки кастомных изображений в реальном времени).
+### Динамические текстуры (RGBA)
 
-### `destroy_texture(id)`
-Удаляет текстуру из видеопамяти и освобождает ресурсы.
+Идеально подходят для рендеринга кастомных изображений в реальном времени.
 
----
-
-## 📏 Базовые функции
-
-* `render.screen_size()` -> `vec2_t` (Возвращает размер экрана)
-* `render.frame_time()` -> `number` (Время отрисовки последнего кадра - DeltaTime)
-* `render.frame_count()` -> `number` (Счетчик кадров ImGui)
-* `render.world_to_screen(pos_vec3)` -> `vec2_t` | `nil` (Переводит 3D координаты мира в 2D координаты экрана. Возвращает `nil`, если точка находится за спиной камеры).
-* `render.push_clip_rect(from_vec2, to_vec2, [intersect])` (Ограничивает зону отрисовки)
-* `render.pop_clip_rect()` (Убирает ограничение зоны отрисовки)
+* `setup_texture_rgba(data_table, size_vec2)`
+    * **Описание:** Первоначально создаёт динамическую RGBA-текстуру из массива пикселей.
+    * **Аргументы:** `data_table` (таблица пикселей `uint32_t`), `size_vec2` (объект `vec2_t` с размерами).
+    * **Возвращает:** `number` (ID текстуры) или `-1` при ошибке.
+* `update_texture_rgba(id, data_table, size_vec2)`
+    * **Описание:** Безопасно перезаписывает пиксели в уже существующую текстуру без аллокации новых слотов. Оптимизировано для вызова каждый кадр.
+    * **Возвращает:** `boolean` (`true` при успехе).
+* `destroy_texture(id)`
+    * **Описание:** Уничтожает текстуру, освобождает ресурсы в видеопамяти (`ID3D11ShaderResourceView::Release()`) и очищает слот для переиспользования.
 
 ---
 
-## 📐 2D Примитивы
+## ✂️ Ограничение зоны отрисовки (Clipping)
 
-Все координаты для этих функций передаются в формате `vec2_t`.
+Система клиппинга применяется ко всем 2D/3D примитивам, включая текст, текстуры, градиенты и фигуры. Все элементы рисуются через единый `GetLuaRenderDrawList()`.
 
-### Текст и Изображения
-* `render.calc_text_size(text, font_id, [size])` -> `vec2_t`
-* `render.text(text, font_id, pos, color, [size])`
-* `render.texture(tex_id, from, to, [color], [rounding])`
+* `render.push_clip_rect(from, to, [intersect])` — Ограничивает зону отрисовки заданным прямоугольником (координаты `vec2_t`). Если `intersect` равен `true`, новая зона пересекается с предыдущей.
+* `render.pop_clip_rect()` — Убирает последнее ограничение.
 
-### Прямоугольники и Линии
-* `render.rect(from, to, color, [rounding], [thickness])`
-* `render.rect_filled(from, to, color, [rounding])`
-* `render.rect_filled_fade(from, to, col_ul, col_ur, col_br, col_bl)` — Прямоугольник с градиентом по 4 углам.
-* `render.line(from, to, color, [thickness])`
-* `render.poly_line(table_of_vec2, color, [thickness])`
-
-### Круги и Полигоны
-* `render.circle(pos, radius, segments, color, [thickness])`
-* `render.circle_filled(pos, radius, segments, color)`
-* `render.circle_fade(pos, radius, color_in, color_out)` — Залитый круг с радиальным градиентом (от центра к краям).
-* `render.arc(pos, radius, a_min, a_max, segments, color, [thickness])`
-* `render.filled_polygon(table_of_vec2, color)`
-
----
-
-## 🌐 3D Примитивы (В мире)
-
-Эти функции принимают 3D координаты (`vec3_t`) и сами переводят их на экран, создавая правильную перспективу. Идеально подходит для ESP.
-
-* `render.circle_3d(pos, radius, color, [thickness], [normal_vec3])`
-* `render.circle_filled_3d(pos, radius, color, [normal_vec3])`
-* `render.circle_fade_3d(pos, radius, color_in, color_out, [normal_vec3])`
-
-*Примечание: Если `normal_vec3` не передан, круг рисуется на земле по умолчанию.*
+> **Защита от ошибок:** Если скрипт забыл вызвать `pop_clip_rect()`, движок автоматически очистит стек клиппинга в конце выполнения `OnPaint()`, предотвращая визуальные баги.
 
 ---
 
 ## 🌫 Эффекты размытия (UI Blur)
 
-Функции для создания красивого заднего фона у окон и плашек в стиле современных читов.
+Функции для создания современного дизайна (эффект матового стекла, блюр панелей) на базе DirectX 11 шейдеров.
 
-* `render.set_blur_mode(mode_int, passes_int)` — Устанавливает глобальный режим размытия (например, качество и количество проходов).
+### Глобальная настройка
+* `render.set_blur_mode(mode, passes)`
+    * **Описание:** Устанавливает алгоритм и качество глобального блюра.
+    * **mode:** `0` — Gaussian, `1` — Kawase, `2` — DualKawase, `3` — RadialHiQuality.
+    * **passes:** Интенсивность/количество проходов шейдера (обычно от 2 до 6).
+
+### Отрисовка блюр-фигур
+Во всех функциях ниже `strength` задает силу размытия текстуры (от `0.0` до `1.0`), а параметры `r, g, b, a` (0-255) отвечают за цвет и прозрачность накладываемого поверх оттенка (тинта).
+
 * `render.draw_blurred_rect(x, y, w, h, strength, r, g, b, a, rounding)`
+    * Рисует прямоугольник с заблюренным фоном. Если `rounding` больше `0.0`, углы будут скругленными.
 * `render.draw_blurred_circle(x, y, radius, strength, r, g, b, a, [segments])`
+    * Рисует заблюренный круг. Опциональный параметр `segments` отвечает за гладкость круга (по умолчанию `36`).
 * `render.draw_blurred_triangle(x1, y1, x2, y2, x3, y3, strength, r, g, b, a)`
+    * Рисует треугольник с блюром по координатам трех вершин.
 
-**Пример размытого прямоугольника:**
-```lua
-register_callback("paint", function()
-    -- Рисуем размытый квадрат 200x200 на координатах 50, 50
-    render.draw_blurred_rect(50, 50, 200, 200, 5.0, 255, 255, 255, 255, 8.0)
-end)
-```
+---
+
+## 📏 Базовые функции и утилиты
+
+| Функция | Описание |
+| :--- | :--- |
+| `render.screen_size()` | Возвращает размер экрана как `vec2_t`. |
+| `render.frame_time()` | Возвращает время отрисовки последнего кадра (DeltaTime). |
+| `render.frame_count()` | Возвращает счетчик кадров ImGui. |
+| `render.calc_text_size(text, font_id, [size])` | Возвращает размер текста как `vec2_t` для правильного позиционирования. |
+| `render.world_to_screen(pos)` | Переводит 3D координаты (`vec3_t`) в 2D (`vec2_t`). Возвращает `nil`, если точка за спиной камеры. |
+
+---
+
+## 📐 2D Примитивы
+
+Все координаты передаются в формате `vec2_t`.
+
+* **Текст и текстуры:**
+    * `render.text(text, font_id, pos, color, [size])`
+    * `render.texture(tex_id, from, to, [color], [rounding])`
+* **Прямоугольники:**
+    * `render.rect(from, to, color, [rounding], [thickness])`
+    * `render.rect_filled(from, to, color, [rounding])`
+    * `render.rect_filled_fade(from, to, col_ul, col_ur, col_br, col_bl)` — Прямоугольник с независимым градиентом по 4 углам.
+* **Линии и полигоны:**
+    * `render.line(from, to, color, [thickness])`
+    * `render.poly_line(table_of_vec2, color, [thickness])`
+    * `render.filled_polygon(table_of_vec2, color)`
+* **Круги:**
+    * `render.circle(pos, radius, segments, color, [thickness])`
+    * `render.circle_filled(pos, radius, segments, color)`
+    * `render.circle_fade(pos, radius, color_in, color_out)` — Залитый круг с радиальным градиентом (от центра к краям).
+    * `render.arc(pos, radius, a_min, a_max, segments, color, [thickness])`
+
+---
+
+## 🌐 3D Примитивы (В мире)
+
+Принимают 3D координаты (`vec3_t`) и автоматически применяют проекцию на экран. Если часть фигуры находится за камерой, отрисовка корректно обрабатывает перспективу (идеально для ESP).
+
+* `render.circle_3d(pos, radius, color, [thickness], [normal_vec3])`
+* `render.circle_filled_3d(pos, radius, color, [normal_vec3])`
+* `render.circle_fade_3d(pos, radius, color_in, color_out, [normal_vec3])`
+
+> **Примечание:** Если аргумент `normal_vec3` не передан, примитив рисуется лежащим на земле по умолчанию (нормаль смотрит строго вверх).
