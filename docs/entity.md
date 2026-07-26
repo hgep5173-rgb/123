@@ -3,64 +3,60 @@
 ## `base_entity_t`
 Объект, представляющий игровую сущность в памяти CS2. 
 
-**Ключевая особенность:** Вы можете напрямую обращаться к Netvars (сетевым переменным) по их строковым названиям! Движок автоматически найдет оффсет и прочитает/запишет значение.
+!!! tip "Прямой доступ к Netvars"
+    Вы можете обращаться к сетевым переменным (Netvars) напрямую по их строковым названиям! Движок автоматически найдет оффсет, прочитает или запишет значение без лишнего кода.
 
-### Чтение и Запись Netvars
+### Чтение и Запись
 ```lua
 local local_player = entitylist.get_local_player_pawn()
+if not local_player then return end
 
 -- Чтение
 local hp = local_player.m_iHealth
-local is_scoped = local_player.m_bIsScoped
 local flags = local_player.m_fFlags
 local origin = local_player.m_vecOrigin -- возвращает vec3_t
-local handle = local_player.m_hPlayerPawn -- возвращает новую base_entity_t, а не число!
 
 -- Запись
-local_player.m_iHealth = 100
 local_player.m_bIsScoped = true
-```
 
-### Методы Сущности
-* `ent:get_abs_origin()` -> `vec3_t` — Возвращает абсолютные координаты сущности в мире.
-* `ent:get_class_name()` -> `string` — Возвращает имя класса, например `"C_CSPlayerPawn"`.
-* `ent:get_entity_handle()` -> `number` — Возвращает адрес сущности. Полезно для использования с `ffi.cast`.
+Методы Сущности
 
----
+  - ent:get_abs_origin() -> vec3_t (Возвращает абсолютные координаты в мире).
+  - ent:get_class_name() -> string (Возвращает имя класса, например
+    "C_CSPlayerPawn").
+  - ent:get_entity_handle() -> number (Возвращает адрес сущности. Совместимо с
+    ffi.cast).
 
-## `entitylist`
+entitylist
+
 Таблица для работы с глобальным списком сущностей игры.
 
-### `get_local_player_controller()`
-Возвращает контроллер локального игрока.
-* **Возвращает:** `base_entity_t` | `nil`
+  - entitylist.get_local_player_controller() -> base_entity_t | nil
+  - entitylist.get_local_player_pawn() -> base_entity_t | nil
+  - entitylist.get_entity_from_handle(handle) -> base_entity_t | nil
 
-### `get_local_player_pawn()`
-Возвращает "пешку" (физическое тело) локального игрока.
-* **Возвращает:** `base_entity_t` | `nil`
+Итерация сущностей (get_entities)
 
-### `get_entity_from_handle(handle)`
-Получает сущность по её хэндлу/индексу.
-* **Возвращает:** `base_entity_t` | `nil`
+Движок предоставляет два стиля поиска сущностей.
 
-### `get_entities(...)` (Массив)
-Ищет все сущности указанного класса и возвращает их в виде массива (Lua table).
-* **class_name:** Строка (например, `"C_Chicken"`, `"C_SmokeGrenadeProjectile"`).
-* **inherits:** `boolean` (Искать ли дочерние классы. По умолчанию `false`).
-* **Возвращает:** `table` (Массив `base_entity_t`).
-```lua
-local chickens = entitylist.get_entities("C_Chicken")
-for i, chicken in ipairs(chickens) do
-    print(chicken:get_abs_origin())
+Вариант 1: Массив (Array style)
+
+Возвращает Lua-таблицу со всеми найденными сущностями.
+
+  - class_name: Строка (например, "C_Chicken").
+  - inherits: boolean (Искать ли дочерние классы. По умолчанию false).
+
+local smokes = entitylist.get_entities("C_SmokeGrenadeProjectile")
+for i, smoke in ipairs(smokes) do
+    print(smoke:get_abs_origin().x)
 end
-```
 
-### `get_entities(...)` (Коллбек)
-Оптимизированный поиск сущностей через функцию обратного вызова. Работает быстрее, так как не создает массивы в памяти Lua.
-```lua
+Вариант 2: Коллбек (Callback style - Оптимизированный)
+
+Работает быстрее, так как не создает массивы в памяти Lua (Zero Allocation).
+Идеально для ESP.
+
 entitylist.get_entities("C_Chicken", function(chicken)
     local pos = chicken:get_abs_origin()
-    print("Found a chicken at: ", pos.x)
-    -- Возврат false прервет цикл поиска
+    -- Верните false, если хотите прервать цикл
 end)
-```
