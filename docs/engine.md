@@ -1,74 +1,60 @@
-# ⚙️ Движок и Математика (Engine & Math)
+# ⚙️ Движок (Engine API)
 
-## `engine`
-Таблица для взаимодействия с функциями движка CS2.
-
-* `engine.get_netvar_offset(module, class, prop)` -> `number`
-* `engine.play_sound(sound_name, volume)`
-* `engine.execute_client_cmd(cmd_string)` — Выполняет консольную команду (добавляется в безопасную очередь).
-* `engine.camera_in_thirdperson()` -> `boolean`
-* `engine.get_level_name()` -> `string`
-* `engine.trace_bullet(pawn_ent, start_vec3, end_vec3)` -> `number` | `nil` — Симуляция выстрела с учетом AutoWall. Возвращает нанесенный урон, или `nil`, если пуля не долетела.
+Таблица `engine` дает возможность взаимодействовать с глобальным состоянием клиента CS2: проверять статус подключения, менять углы обзора, выполнять консольные команды и получать информацию о карте.
 
 ---
 
-## `math`
-Математические функции.
+## 🌐 Состояние клиента
 
-* `math.calc_angle(src_vec3, dst_vec3)` -> `angle_t`
-* `math.calc_fov(src_angle, dst_angle)` -> `number`
-* `math.normalize_angle(angle)` -> `number`
-* `math.vector_angles(fwd_vec3)` -> `angle_t`
-* `math.angle_vectors(angle)` -> `vec3_t, vec3_t, vec3_t` (Возвращает `forward`, `right`, `up`).
+### `engine.is_connected()`
+Проверяет, установлено ли соединение с сервером.
+* **Возвращает:** `boolean`
 
----
+### `engine.is_in_game()`
+Проверяет, зашел ли игрок на карту и находится ли в процессе игры.
+* **Возвращает:** `boolean`
 
-## `cvars` (Консольные переменные)
-Управление консольными переменными игры. Получаются через глобальную таблицу `cvars`. 
-
-**Методы объекта `convar_t`:**
-* `cv:get_name()` -> `string`
-* `cv:get_desc()` -> `string`
-* `cv:get_float()` -> `number`
-* `cv:get_int()` -> `number`
-* `cv:get_bool()` -> `boolean`
-* `cv:get_string()` -> `string`
+### `engine.get_map_name()`
+* **Возвращает:** `string` (Например: `"de_mirage"`)
 
 ---
 
-## `game_event_t` (Игровые события)
-Объект, передаваемый в обработчики событий (например, `game_event`, `player_death`).
+## 🎥 Камера и Углы
 
-* `event:get_name()` -> `string`
-* `event:get_int(key)` -> `number`
-* `event:get_float(key)` -> `number`
-* `event:get_string(key)` -> `string`
+### `engine.get_view_angles()`
+Возвращает текущие углы обзора локального игрока в движке.
+* **Возвращает:** `angle_t`
 
-!!! tip "Безопасное получение сущностей"
-    Методы ниже работают напрямую, обходя уязвимые vtable-геттеры, что исключает краши.
+### `engine.set_view_angles(angles)`
+Устанавливает новые углы обзора. Часто используется для реализации AimBot или Anti-Aim функций.
+* **angles:** `angle_t`
 
-* `event:get_pawn(key)` -> `base_entity_t` | `nil`
-* `event:get_controller(key)` -> `base_entity_t` | `nil`
-
----
-
-## `ui` & `view_setup_t`
-
-### `ui`
-* `ui.is_menu_opened()` -> `boolean` — Возвращает `true`, если меню чита открыто.
-
-### `view_setup_t` (Изменение камеры)
-Передается в коллбек `override_view`.
-* **Доступные поля:**
-  * `setup.fov` (`number`)
-  * `setup.fov_viewmodel` (`number`)
-  * `setup.origin` (`vec3_t`)
-  * `setup.angles` (`angle_t`)
+!!! warning "Осторожно"
+    Установка некорректных углов (Pitch > 89 или < -89) без правильной нормализации на немодифицированных серверах приведет к кику (Untrusted).
 
 ---
 
-## 🔌 FFI (Вызов C-функций)
-Наш API включает стандартную библиотеку `ffi` из LuaJIT. 
+## 💻 Консоль и Инфо
 
-!!! note "Защита от крашей"
-    В движок встроен безопасный перехватчик `ffi.cdef`. Он игнорирует ошибки дублирования структур, чтобы эмулировать поведение Nixware/Primordial и не ломать скрипты при их перезагрузке.
+### `engine.execute_client_cmd(command)`
+Исполняет команду в консоли разработчика от лица клиента.
+* **command:** `string`
+
+### `engine.get_screen_size()`
+Возвращает размер игрового окна движка (отличается от `render.screen_size()`, если используются нестандартные режимы масштабирования).
+* **Возвращает:** `vec2_t`
+
+!!! example "Пример спама в консоль при подключении"
+    ```lua
+    local was_in_game = false
+
+    register_callback("paint", function()
+        local in_game = engine.is_in_game()
+        
+        if in_game and not was_in_game then
+            engine.execute_client_cmd("echo [MyScript] Successfully loaded into " .. engine.get_map_name())
+        end
+        
+        was_in_game = in_game
+    end)
+    ```
