@@ -1,66 +1,70 @@
-# 🏃 Сущности (Entity API)
+# 🧍 Сущности (Entity API)
 
-## `base_entity_t`
-Объект, представляющий игровую сущность в памяти CS2. 
-
-**Ключевая особенность:** Вы можете напрямую обращаться к Netvars (сетевым переменным) по их строковым названиям! Движок автоматически найдет оффсет и прочитает/запишет значение.
-
-### Чтение и Запись Netvars
-```lua
-local local_player = entitylist.get_local_player_pawn()
-
--- Чтение
-local hp = local_player.m_iHealth
-local is_scoped = local_player.m_bIsScoped
-local flags = local_player.m_fFlags
-local origin = local_player.m_vecOrigin -- возвращает vec3_t
-local handle = local_player.m_hPlayerPawn -- возвращает новую base_entity_t, а не число!
-
--- Запись
-local_player.m_iHealth = 100
-local_player.m_bIsScoped = true
-```
-
-### Методы Сущности
-* `ent:get_abs_origin()` -> `vec3_t` — Возвращает абсолютные координаты сущности в мире.
-* `ent:get_class_name()` -> `string` — Возвращает имя класса, например `"C_CSPlayerPawn"`.
-* `ent:get_entity_handle()` -> `number` — Возвращает адрес сущности. Полезно для использования с `ffi.cast`.
+Таблица `entity` предоставляет функционал для взаимодействия с игроками, оружием и объектами на карте (пропсами).
 
 ---
 
-## `entitylist`
-Таблица для работы с глобальным списком сущностей игры.
+## 🔍 Глобальные функции
 
-### `get_local_player_controller()`
-Возвращает контроллер локального игрока.
-* **Возвращает:** `base_entity_t` | `nil`
+### `entity.get_local_player()`
+Возвращает объект локального игрока.
+* **Возвращает:** `Entity` (Или `nil`, если игрок не подключен к серверу или мертв/в спектаторах, в зависимости от логики).
 
-### `get_local_player_pawn()`
-Возвращает "пешку" (физическое тело) локального игрока.
-* **Возвращает:** `base_entity_t` | `nil`
+### `entity.get_player(index)`
+Получает сущность игрока по его индексу на сервере.
+* **index:** `number` (От 1 до 64)
+* **Возвращает:** `Entity` | `nil`
 
-### `get_entity_from_handle(handle)`
-Получает сущность по её хэндлу/индексу.
-* **Возвращает:** `base_entity_t` | `nil`
+### `entity.get_all()`
+Возвращает массив всех активных сущностей игроков на сервере.
+* **Возвращает:** `table` (Массив объектов `Entity`).
 
-### `get_entities(...)` (Массив)
-Ищет все сущности указанного класса и возвращает их в виде массива (Lua table).
-* **class_name:** Строка (например, `"C_Chicken"`, `"C_SmokeGrenadeProjectile"`).
-* **inherits:** `boolean` (Искать ли дочерние классы. По умолчанию `false`).
-* **Возвращает:** `table` (Массив `base_entity_t`).
-```lua
-local chickens = entitylist.get_entities("C_Chicken")
-for i, chicken in ipairs(chickens) do
-    print(chicken:get_abs_origin())
-end
-```
+---
 
-### `get_entities(...)` (Коллбек)
-Оптимизированный поиск сущностей через функцию обратного вызова. Работает быстрее, так как не создает массивы в памяти Lua.
-```lua
-entitylist.get_entities("C_Chicken", function(chicken)
-    local pos = chicken:get_abs_origin()
-    print("Found a chicken at: ", pos.x)
-    -- Возврат false прервет цикл поиска
-end)
-```
+## 🧬 Объект `Entity`
+
+Объект сущности позволяет читать свойства памяти (NetVars / Schema System).
+
+### Базовые методы
+* `entity:get_index()` -> `number` (Индекс сущности)
+* `entity:is_valid()` -> `boolean` (Проверка на то, существует ли сущность прямо сейчас)
+* `entity:is_alive()` -> `boolean`
+* `entity:is_dormant()` -> `boolean` (Находится ли игрок вне зоны видимости сервера - PVS)
+* `entity:get_team()` -> `number` (Обычно 2 - T, 3 - CT)
+
+### Координаты и Хитбоксы
+* `entity:get_origin()` -> `vec3_t` (Координаты в мире)
+* `entity:get_bone_position(bone_index)` -> `vec3_t` (Позиция конкретной кости, например, головы)
+* `entity:get_bounding_box()` -> `table` (Возвращает `{x1, y1, x2, y2}` для отрисовки ESP)
+
+### Schema / Prop система
+Для доступа к внутренней памяти Source 2 используются пропы (NetVars).
+
+* `entity:get_prop_int(name)` -> `number`
+* `entity:get_prop_float(name)` -> `number`
+* `entity:get_prop_bool(name)` -> `boolean`
+
+!!! example "Пример использования ESP"
+    ```lua
+    register_callback("paint", function()
+        local local_player = entity.get_local_player()
+        if not local_player then return end
+        
+        local players = entity.get_all()
+        for i = 1, #players do
+            local enemy = players[i]
+            
+            if enemy:is_alive() and not enemy:is_dormant() and enemy:get_team() ~= local_player:get_team() then
+                local bbox = enemy:get_bounding_box()
+                if bbox then
+                    -- Рисуем квадрат ESP вокруг противника
+                    render.rect(
+                        vec2_t(bbox.x1, bbox.y1), 
+                        vec2_t(bbox.x2, bbox.y2), 
+                        color_t(255, 50, 50, 255)
+                    )
+                end
+            end
+        end
+    end)
+    ```
